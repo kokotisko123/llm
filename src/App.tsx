@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ShoppingBag, Euro, Home, Instagram, Globe } from 'lucide-react';
+import { ShoppingBag, Euro, Home, Instagram, Globe, Menu, X } from 'lucide-react';
 
 const matrixCode = `
 <?php
@@ -218,9 +218,41 @@ function App() {
   const [showLanguageMenu, setShowLanguageMenu] = useState(false);
   const [magnifierPosition, setMagnifierPosition] = useState({ x: 0, y: 0 });
   const [showMagnifier, setShowMagnifier] = useState(false);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
   const imageRef = useRef<HTMLDivElement>(null);
 
   const t = translations[language];
+
+  useEffect(() => {
+    if (!showSeized || waitingForReboot) return;
+
+    const audio = new Audio('https://cdn.pixabay.com/download/audio/2022/03/10/audio_c8b4abe48d.mp3');
+    audio.loop = true;
+    audio.volume = 0.5;
+
+    const playAudio = async () => {
+      try {
+        await audio.play();
+      } catch (error) {
+        console.log("Audio playback failed:", error);
+      }
+    };
+
+    playAudio();
+
+    return () => {
+      audio.pause();
+      audio.currentTime = 0;
+    };
+  }, [showSeized, waitingForReboot]);
+
+  useEffect(() => {
+    const shouldLockScroll = (showMobileMenu || selectedProduct) && window.innerWidth < 768;
+    document.body.style.overflow = shouldLockScroll ? 'hidden' : 'unset';
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [showMobileMenu, selectedProduct]);
 
   const handleReboot = () => {
     setWaitingForReboot(true);
@@ -303,17 +335,41 @@ function App() {
 
   return (
     <div className="min-h-screen bg-[#111] text-white">
-      <nav className="bg-black/50 backdrop-blur-lg border-b border-white/10 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-          <div className="flex items-center space-x-8">
-            <Home className="w-6 h-6 cursor-pointer hover:text-white/70 transition-colors" />
-            <span className="text-sm">{t.shopAll}</span>
-            <span className="text-sm">{t.contact}</span>
-            <span className="text-sm">{t.policies}</span>
+      {showMobileMenu && (
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 md:hidden">
+          <div className="h-full w-64 bg-[#111] border-r border-white/10">
+            <div className="p-4 flex justify-between items-center border-b border-white/10">
+              <Euro className="w-6 h-6 spin text-white" />
+              <button onClick={() => setShowMobileMenu(false)}>
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="p-4 space-y-4">
+              <button className="w-full text-left py-2 hover:text-white/70 transition-colors">{t.shopAll}</button>
+              <button className="w-full text-left py-2 hover:text-white/70 transition-colors">{t.contact}</button>
+              <button className="w-full text-left py-2 hover:text-white/70 transition-colors">{t.policies}</button>
+            </div>
           </div>
+        </div>
+      )}
+
+      <nav className="bg-black/50 backdrop-blur-lg border-b border-white/10 sticky top-0 z-40">
+        <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
+          <button className="md:hidden" onClick={() => setShowMobileMenu(true)}>
+            <Menu className="w-6 h-6" />
+          </button>
+          
+          <div className="hidden md:flex items-center space-x-8">
+            <Home className="w-6 h-6 cursor-pointer hover:text-white/70 transition-colors" />
+            <span className="text-sm cursor-pointer hover:text-white/70 transition-colors">{t.shopAll}</span>
+            <span className="text-sm cursor-pointer hover:text-white/70 transition-colors">{t.contact}</span>
+            <span className="text-sm cursor-pointer hover:text-white/70 transition-colors">{t.policies}</span>
+          </div>
+
           <div className="absolute left-1/2 -translate-x-1/2">
             <Euro className="w-8 h-8 spin text-white" />
           </div>
+
           <div className="flex items-center space-x-6">
             <div className="relative">
               <button
@@ -382,9 +438,16 @@ function App() {
       </main>
 
       {selectedProduct && (
-        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="max-w-5xl w-full bg-[#111] border border-white/10 rounded-2xl p-8">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-start md:items-center justify-center z-50">
+          <div className="w-full h-full md:h-auto md:max-w-5xl bg-[#111] md:border md:border-white/10 md:rounded-2xl p-4 md:p-8 overflow-y-auto md:overflow-visible">
+            <button 
+              onClick={() => setSelectedProduct(null)}
+              className="fixed top-4 right-4 z-50 md:hidden bg-black/50 p-2 rounded-full"
+            >
+              <X className="w-6 h-6" />
+            </button>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12">
               <div className="space-y-4">
                 <div 
                   ref={imageRef}
@@ -399,7 +462,7 @@ function App() {
                     className="w-full h-full object-cover"
                   />
                   <div 
-                    className="magnifier-glass"
+                    className="magnifier-glass hidden md:block"
                     style={{
                       display: showMagnifier ? 'block' : 'none',
                       left: `${magnifierPosition.x}px`,
@@ -407,13 +470,13 @@ function App() {
                     }}
                   />
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 overflow-x-auto pb-2">
                   {selectedProduct.images.map((img, idx) => (
                     img && (
                       <button
                         key={idx}
                         onClick={() => setCurrentImageIndex(idx)}
-                        className={`w-20 h-20 bg-black rounded-lg overflow-hidden ${currentImageIndex === idx ? 'ring-2 ring-white' : 'opacity-50'}`}
+                        className={`flex-shrink-0 w-20 h-20 bg-black rounded-lg overflow-hidden ${currentImageIndex === idx ? 'ring-2 ring-white' : 'opacity-50'}`}
                       >
                         <img src={img} alt={`View ${idx + 1}`} className="w-full h-full object-cover" />
                       </button>
@@ -463,7 +526,7 @@ function App() {
                   
                   <button 
                     onClick={() => setSelectedProduct(null)}
-                    className="w-full border border-white/20 py-4 rounded-lg hover:bg-white/10 transition-colors"
+                    className="w-full border border-white/20 py-4 rounded-lg hover:bg-white/10 transition-colors hidden md:block"
                   >
                     {t.close}
                   </button>
